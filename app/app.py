@@ -3,6 +3,7 @@
 # =============================================================================
 
 import os, sys, math, datetime, random, time, base64
+from zoneinfo import ZoneInfo
 import joblib
 import requests
 import numpy as np
@@ -907,7 +908,7 @@ with left_col:
         booking_mode = st.radio("When", ["Right now", "Pick a time"], horizontal=True, key="booking_mode")
 
         if booking_mode == "Right now":
-            now = datetime.datetime.now()
+            now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
             trip_date = now.date()
             trip_hour = now.hour
             trip_minute = now.minute
@@ -924,9 +925,12 @@ with left_col:
         else:
             c1, c2 = st.columns(2)
             with c1:
-                trip_date = st.date_input("Date", datetime.date.today())
+                # Use IST for default date
+                trip_date = st.date_input("Date", datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date())
             with c2:
-                trip_hour = st.slider("Hour (24h)", 0, 23, datetime.datetime.now().hour)
+                # Use IST for default slider hour
+                current_ist_hour = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).hour
+                trip_hour = st.slider("Hour (24h)", 0, 23, current_ist_hour)
             trip_minute = 0
 
         is_holiday = check_is_holiday(trip_date)
