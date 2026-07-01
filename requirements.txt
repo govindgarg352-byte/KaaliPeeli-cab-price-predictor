@@ -14,7 +14,6 @@ numpy==1.26.4
 pandas==2.2.1
 geopy==2.4.1              # distance calculations between coordinates
 
-tzdata==2026.a
 # EDA & Visualization
 matplotlib==3.8.3
 seaborn==0.13.2
