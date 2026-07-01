@@ -9,11 +9,11 @@
 # but the processed dataset CSV is kept in version control.
 data/raw/
 data/processed/model_ready/
-data/processed/trained_models/
+# data/processed/trained_models/
 data/splits/
 
 # Saved models — regenerate via training scripts
-models/saved/
+# models/saved/
 
 # Python cache
 __pycache__/

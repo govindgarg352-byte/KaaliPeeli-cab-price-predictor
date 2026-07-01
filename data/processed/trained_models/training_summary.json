@@ -1,0 +1,17 @@
+{
+  "model1_time": {
+    "rmse_xgb": 2.5311,
+    "rmse_lgbm": 2.4871,
+    "rmse_cb": 2.4553,
+    "rmse_stacked": 2.4579,
+    "meta_learner": "Lasso"
+  },
+  "model2_fare": {
+    "rmse_xgb": 130.0591,
+    "rmse_lgbm": 130.4529,
+    "rmse_cb": 127.0281,
+    "rmse_stacked": 126.7368,
+    "meta_learner": "ElasticNet",
+    "note": "ETA feature = Model 1 stacked OOF predictions (not ground truth)"
+  }
+}

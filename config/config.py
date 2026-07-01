@@ -13,14 +13,30 @@
 
 import os
 from dotenv import load_dotenv
+load_dotenv()
+import os
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+try:
+    import streamlit as st
+    _HAS_STREAMLIT = True
+except ImportError:
+    _HAS_STREAMLIT = False
+
+def get_api_key(name: str):
+    """Reads from Streamlit Secrets when deployed, falls back to .env locally."""
+    if _HAS_STREAMLIT:
+        try:
+            if name in st.secrets:
+                return st.secrets[name]
+        except Exception:
+            pass
+    return os.getenv(name)
 
 API_KEYS = {
-    "openrouteservice": os.getenv("ORS_API_KEY"),
-    "openweathermap":   os.getenv("OWM_API_KEY"),
-    "calendarific":     os.getenv("CALENDARIFIC_API_KEY"),
-    "tomtom":           os.getenv("TOMTOM_API_KEY"),
+    "openrouteservice": get_api_key("ORS_API_KEY"),
+    "openweathermap": get_api_key("OWM_API_KEY"),
+    "calendarific": get_api_key("CALENDARIFIC_API_KEY"),
+    "tomtom": get_api_key("TOMTOM_API_KEY"),
 }
 
 # =============================================================================
