@@ -954,25 +954,22 @@ with left_col:
             </div>
             """, unsafe_allow_html=True)
         else:
-            c1, c2 = st.columns([1,1.5])
+            now_ist = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+            default_hour_12 = now_ist.hour % 12
+            default_hour_12 = 12 if default_hour_12 == 0 else default_hour_12
+            default_minute = now_ist.minute
+            default_ampm = "PM" if now_ist.hour >= 12 else "AM"
+
+            c1, c2, c3, c4 = st.columns([1.6, 1, 1, 1])
             with c1:
-                # Use IST for default date
-                trip_date = st.date_input("Date", datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date())
+                trip_date = st.date_input("Date", now_ist.date())
             with c2:
-                now_ist = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
-                default_hour_12 = now_ist.hour % 12
-                default_hour_12 = 12 if default_hour_12 == 0 else default_hour_12
-                default_minute = now_ist.minute
-                default_ampm = "PM" if now_ist.hour >= 12 else "AM"
-
-                th1, th2, th3 = st.columns([1.2, 1.2, 1.2])
-                with th1:
-                    pick_hour = st.selectbox("Hour", list(range(1, 13)), index=default_hour_12 - 1, key="pick_hour")
-                with th2:
-                    pick_minute = st.selectbox("Minute", [f"{m:02d}" for m in range(60)], index=default_minute, key="pick_minute")
-                with th3:
-                    pick_ampm = st.selectbox("AM/PM", ["AM", "PM"], index=0 if default_ampm == "AM" else 1, key="pick_ampm")
-
+                pick_hour = st.selectbox("Hour", list(range(1, 13)), index=default_hour_12 - 1, key="pick_hour")
+            with c3:
+                pick_minute = st.selectbox("Minute", [f"{m:02d}" for m in range(60)], index=default_minute, key="pick_minute")
+            with c4:
+                pick_ampm = st.selectbox("AM/PM", ["AM", "PM"], index=0 if default_ampm == "AM" else 1, key="pick_ampm")
+                
             # Convert 12h dropdown selection back to 24h for downstream logic
             trip_hour = pick_hour % 12
             if pick_ampm == "PM":
