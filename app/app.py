@@ -11,6 +11,7 @@ import pandas as pd
 import streamlit as st
 import pydeck as pdk
 import plotly.graph_objects as go
+import streamlit.components.v1 as components
 
 # ── path setup ────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.join(os.path.dirname(__file__), "..")
@@ -469,6 +470,36 @@ def get_ors_route(src_lat, src_lng, dst_lat, dst_lng):
     base_time_min = round(distance_km / 50 * 60, 2)
     return distance_km, base_time_min
 
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_ors_route_geometry(src_lat, src_lng, dst_lat, dst_lng):
+    """
+    Fetches the actual turn-by-turn driving path (not a straight line) between
+    two points using ORS's GeoJSON directions endpoint. Returns a list of
+    [lng, lat] coordinate pairs tracing the real road route, ready for a
+    pydeck PathLayer. Falls back to a simple two-point line if ORS is
+    unavailable, so the map never breaks even without connectivity.
+    """
+    url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
+    headers = {
+        "Authorization": API_KEYS["openrouteservice"],
+        "Content-Type": "application/json"
+    }
+    body = {
+        "coordinates": [[src_lng, src_lat], [dst_lng, dst_lat]]
+    }
+    try:
+        response = requests.post(url, headers=headers, json=body, timeout=6)
+        if response.status_code == 200:
+            data = response.json()
+            coords = data["features"][0]["geometry"]["coordinates"]  # [[lng, lat], ...]
+            if coords and len(coords) >= 2:
+                return coords
+    except Exception:
+        pass
+    
+    # Fallback: straight line between the two points
+    return [[src_lng, src_lat], [dst_lng, dst_lat]]
+
 def get_current_weather(lat, lng, city):
     url = "http://api.openweathermap.org/data/2.5/weather"
     params = {
@@ -750,10 +781,36 @@ with st.sidebar:
     <div>
         <span style="font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: {sub_text}; font-weight: 700; letter-spacing: 0.05em;">DISPATCHER CHANNELS</span>
         <p style="font-size: 0.82rem; color: {text_color}; margin-top: 0.3rem; line-height: 1.4;">
-            For platform integrations or API support requests, email the telemetry squad at: <b style="color: {acc1};">telemetry@faremind.ai</b>
+            For platform integrations or API support requests, email the telemetry squad at: <b style="color: {acc1};">kaalipeeli@info.in</b>
         </p>
     </div>
     """, unsafe_allow_html=True)
+
+# Click outside the sidebar to auto-collapse it
+components.html(
+    """
+    <script>
+    const doc = window.parent.document;
+
+    doc.addEventListener('click', function(e) {
+        const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+        if (!sidebar) return;
+
+        const toggleBtn = doc.querySelector('[data-testid="stExpandSidebarButton"]');
+        const clickedInsideSidebar = sidebar.contains(e.target);
+        const clickedToggleButton = toggleBtn && toggleBtn.contains(e.target);
+        const sidebarIsOpen = sidebar.offsetWidth > 0;
+
+        if (sidebarIsOpen && !clickedInsideSidebar && !clickedToggleButton) {
+            if (toggleBtn) {
+                toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            }
+        }
+    });
+    </script>
+    """,
+    height=0,
+)
 
 # ── Header Row: wordmark left, theme toggle right ─────────────────────────────
 header_col1, header_col2 = st.columns([10, 1.2])
@@ -923,15 +980,38 @@ with left_col:
             </div>
             """, unsafe_allow_html=True)
         else:
-            c1, c2 = st.columns(2)
+            c1, c2 = st.columns([1,1.5])
             with c1:
                 # Use IST for default date
                 trip_date = st.date_input("Date", datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date())
             with c2:
-                # Use IST for default slider hour
-                current_ist_hour = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).hour
-                trip_hour = st.slider("Hour (24h)", 0, 23, current_ist_hour)
-            trip_minute = 0
+                now_ist = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+                default_hour_12 = now_ist.hour % 12
+                default_hour_12 = 12 if default_hour_12 == 0 else default_hour_12
+                default_minute = now_ist.minute
+                default_ampm = "PM" if now_ist.hour >= 12 else "AM"
+
+                th1, th2, th3 = st.columns([1.2, 1.2, 1.2])
+                with th1:
+                    pick_hour = st.selectbox("Hour", list(range(1, 13)), index=default_hour_12 - 1, key="pick_hour")
+                with th2:
+                    pick_minute = st.selectbox("Minute", [f"{m:02d}" for m in range(60)], index=default_minute, key="pick_minute")
+                with th3:
+                    pick_ampm = st.selectbox("AM/PM", ["AM", "PM"], index=0 if default_ampm == "AM" else 1, key="pick_ampm")
+
+            # Convert 12h dropdown selection back to 24h for downstream logic
+            trip_hour = pick_hour % 12
+            if pick_ampm == "PM":
+                trip_hour += 12
+            trip_minute = int(pick_minute)
+
+            # Block scheduling a time that's already in the past
+            picked_dt = datetime.datetime.combine(
+                trip_date, datetime.time(trip_hour, trip_minute)
+            ).replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            now_ist_check = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+            if picked_dt < now_ist_check:
+                st.error("⏰ You've picked a time in the past — please choose a current or upcoming time.")
 
         is_holiday = check_is_holiday(trip_date)
         day_of_week = trip_date.strftime("%A")
@@ -1000,10 +1080,11 @@ with right_col:
                 {"name": f"Pickup: {src_sub}", "lat": src_lat, "lon": src_lng, "color": [255, 199, 0, 230], "radius": 240},
                 {"name": f"Dropoff: {dst_sub}", "lat": dst_lat, "lon": dst_lng, "color": [228, 72, 61, 230], "radius": 240}
             ])
-            line_df = pd.DataFrame([
-                {"start_lat": src_lat, "start_lng": src_lng, "end_lat": dst_lat, "end_lng": dst_lng}
-            ])
-            
+
+            # Real driving route geometry (turn-by-turn road path), not a straight line
+            route_coords = get_ors_route_geometry(src_lat, src_lng, dst_lat, dst_lng)
+            path_df = pd.DataFrame([{"path": route_coords}])
+
             layers.append(pdk.Layer(
                 "ScatterplotLayer",
                 points_df,
@@ -1013,12 +1094,14 @@ with right_col:
                 pickable=True
             ))
             layers.append(pdk.Layer(
-                "LineLayer",
-                line_df,
-                get_source_position="[start_lng, start_lat]",
-                get_target_position="[end_lng, end_lat]",
-                get_color="[255, 199, 0, 200]",
-                get_width=4
+                "PathLayer",
+                path_df,
+                get_path="path",
+                get_color=[255, 199, 0, 200],
+                get_width=5,
+                width_min_pixels=3,
+                rounded=True,
+                pickable=False
             ))
         
         deck = pdk.Deck(
