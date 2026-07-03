@@ -786,32 +786,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# Click outside the sidebar to auto-collapse it
-components.html(
-    """
-    <script>
-    const doc = window.parent.document;
-
-    doc.addEventListener('click', function(e) {
-        const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-        if (!sidebar) return;
-
-        const toggleBtn = doc.querySelector('[data-testid="stExpandSidebarButton"]');
-        const clickedInsideSidebar = sidebar.contains(e.target);
-        const clickedToggleButton = toggleBtn && toggleBtn.contains(e.target);
-        const sidebarIsOpen = sidebar.offsetWidth > 0;
-
-        if (sidebarIsOpen && !clickedInsideSidebar && !clickedToggleButton) {
-            if (toggleBtn) {
-                toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-            }
-        }
-    });
-    </script>
-    """,
-    height=0,
-)
-
 # ── Header Row: wordmark left, theme toggle right ─────────────────────────────
 header_col1, header_col2 = st.columns([10, 1.2])
 with header_col1:
